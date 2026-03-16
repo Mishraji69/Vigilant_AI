@@ -183,7 +183,9 @@ export const coordinatorService = {
   async getScenarios() {
     try {
       const response = await apiClient.get('/api/scenarios');
-      return response.map(adaptScenario);
+      // Safety: ensure response is an array before mapping
+      const scenarioArray = Array.isArray(response) ? response : (response.scenarios || response.data || []);
+      return scenarioArray.map(adaptScenario);
     } catch (error) {
       console.error('Failed to fetch scenarios:', error);
       throw error;
