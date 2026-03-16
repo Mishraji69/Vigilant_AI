@@ -3,7 +3,8 @@ from pypdf import PdfReader
 from bs4 import BeautifulSoup
 
 import utils.constants
-
+import requests
+import os
 import subprocess
 
 PDF_WORKING_FOLDER = utils.constants.LLM_WORKING_FOLDER + "/pdf"
@@ -17,12 +18,14 @@ def download_pdf_report(
 ) -> Annotated[str, "The content of the PDF report"]:
 
     # Download PDF report to a local folder
-    subprocess.check_output(
-        f"curl -sS {url} -o {PDF_WORKING_FOLDER}/tmp.pdf",
-        shell=True,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+    os.makedirs(PDF_WORKING_FOLDER, exist_ok=True)
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        with open(f"{PDF_WORKING_FOLDER}/tmp.pdf", "wb") as f:
+            f.write(response.content)
+    except Exception as e:
+        return f"Error downloading PDF: {str(e)}"
 
     reader = PdfReader(f"{PDF_WORKING_FOLDER}/tmp.pdf")
     text = ""
@@ -39,12 +42,12 @@ def download_web_page(
     ]
 ) -> Annotated[str, "The content of the web page"]:
 
-    raw_output = subprocess.check_output(
-        f"curl -sS {url}",
-        shell=True,
-        stderr=subprocess.STDOUT,
-        text=True,
-    )
+    try:
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        raw_output = response.text
+    except Exception as e:
+        return f"Error downloading web page: {str(e)}"
 
     soup = BeautifulSoup(raw_output, "html.parser")
     return soup.get_text(strip=True)
@@ -66,12 +69,9 @@ def detect_telemetry_gaps(
     
     try:
         # Download the JSON data
-        raw_output = subprocess.check_output(
-            f'curl -sS {url}',
-            shell=True,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        raw_output = response.text
         
         data = json.loads(raw_output)
         
@@ -150,13 +150,9 @@ def extract_mitre_techniques(
     import re
 
     try:
-        raw_output = subprocess.check_output(
-            f"curl -sS {url}",
-            shell=True,
-            stderr=subprocess.STDOUT,
-            text=True,
-            timeout=30,
-        )
+        response = requests.get(url, timeout=30)
+        response.raise_for_status()
+        raw_output = response.text
         techniques = sorted(set(re.findall(r"T\d{4}(?:\.\d{3})?", raw_output)))
         if not techniques:
             return "No MITRE ATT&CK technique IDs found on the page."
