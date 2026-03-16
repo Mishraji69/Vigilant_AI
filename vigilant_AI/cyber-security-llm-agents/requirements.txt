@@ -1,0 +1,9 @@
+openai
+beautifulsoup4
+python-dotenv
+pandas
+pypdf
+requests
+flask
+flask-cors
+gunicorn
