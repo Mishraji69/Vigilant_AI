@@ -78,17 +78,8 @@ export const coordinatorService = {
    */
   async startWorkflow(scenario) {
     try {
-      // Find scenario by name or ID
-      const scenarios = await this.getScenarios();
-      const targetScenario = scenarios.find(s => 
-        s.name === scenario || s.id === scenario
-      );
-
-      if (!targetScenario) {
-        throw new Error('Scenario not found');
-      }
-
-      const result = await this.runScenario(targetScenario.id);
+      // Directly run the scenario by ID — no need to fetch all scenarios first
+      const result = await this.runScenario(scenario);
       
       return {
         success: true,
