@@ -3,7 +3,18 @@
  * Handles all HTTP requests with error handling and timeout safety
  */
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// Smart API URL detection:
+// 1. Use VITE_API_BASE_URL env var if set (explicit override)
+// 2. In production (non-localhost), use same origin (backend serves from same domain)
+// 3. In development, fall back to localhost:5000
+const getBaseUrl = () => {
+  if (import.meta.env.VITE_API_BASE_URL) return import.meta.env.VITE_API_BASE_URL;
+  if (typeof window !== 'undefined' && !window.location.hostname.includes('localhost')) {
+    return window.location.origin; // Same domain in production
+  }
+  return 'http://localhost:5000';
+};
+const BASE_URL = getBaseUrl();
 const DEFAULT_TIMEOUT = 30000; // 30 seconds
 
 class ApiError extends Error {
