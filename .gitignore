@@ -26,7 +26,6 @@ frontend/dist/
 
 # Working folders
 llm_working_folder/
-vigilant_AI/cyber-security-llm-agents/static_frontend/
 
 # OS files
 .DS_Store
