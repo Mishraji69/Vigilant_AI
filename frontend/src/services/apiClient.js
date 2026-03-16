@@ -32,7 +32,28 @@ const fetchWithTimeout = async (url, options = {}, timeout = DEFAULT_TIMEOUT) =>
   } catch (error) {
     clearTimeout(timeoutId);
     if (error.name === 'AbortError') {
-      throw new ApiError('Request timeout', 408, null);
+      throw new ApiError('Request timeout after 30 seconds', 408, null);
+    }
+    
+    // Provide a much better error message for "Failed to fetch"
+    if (error.message === 'Failed to fetch' || error.name === 'TypeError') {
+      // Are we in production but trying to call localhost?
+      if (typeof window !== 'undefined' && 
+          url.includes('localhost:5000') && 
+          !window.location.hostname.includes('localhost')) {
+          throw new ApiError(
+            `CONFIG ERROR: The frontend is trying to connect to 'http://localhost:5000'. ` + 
+            `You must set the VITE_API_BASE_URL environment variable in Railway to point to your backend URL.`, 
+            0, null
+          );
+      }
+      
+      throw new ApiError(
+        `NETWORK ERROR: Cannot reach backend at ${url}. ` + 
+        `1) Is the backend running? ` +
+        `2) Is VITE_API_BASE_URL correct? ` +
+        `3) Does the backend allow CORS for this domain?`, 0, null
+      );
     }
     throw error;
   }
