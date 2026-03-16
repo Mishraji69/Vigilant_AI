@@ -3,7 +3,7 @@ Flask API Server for Vigilant AI Backend
 Exposes REST endpoints without modifying core backend logic
 """
 
-from flask import Flask, jsonify, request, send_file
+from flask import Flask, jsonify, request, send_file, send_from_directory
 from flask_cors import CORS
 import sqlite3
 import json
@@ -15,7 +15,9 @@ from pathlib import Path
 import utils.constants
 from actions.agent_actions import actions, scenarios
 
-app = Flask(__name__)
+# Serve React frontend from static_frontend/ directory
+FRONTEND_DIR = os.path.join(SCRIPT_DIR, 'static_frontend')
+app = Flask(__name__, static_folder=FRONTEND_DIR, static_url_path='')
 CORS(app)  # Enable CORS for frontend integration
 
 # Configuration
@@ -435,7 +437,28 @@ def health_check():
 # MAIN
 # ============================================
 
+# ============================================
+# SERVE REACT FRONTEND (catch-all)
+# ============================================
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Serve React frontend - catch all non-API routes"""
+    # If the requested file exists in static_frontend, serve it
+    file_path = os.path.join(FRONTEND_DIR, path)
+    if path and os.path.exists(file_path) and os.path.isfile(file_path):
+        return send_from_directory(FRONTEND_DIR, path)
+    # Otherwise serve index.html (SPA client-side routing)
+    index_path = os.path.join(FRONTEND_DIR, 'index.html')
+    if os.path.exists(index_path):
+        return send_from_directory(FRONTEND_DIR, 'index.html')
+    return jsonify({"error": "Frontend not built. Run build script first."}), 404
+
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', os.getenv('API_PORT', 5000)))
     print(f"Starting Vigilant AI API Server on port {port}...")
+    print(f"Frontend dir: {FRONTEND_DIR}")
+    print(f"Frontend exists: {os.path.exists(os.path.join(FRONTEND_DIR, 'index.html'))}")
     app.run(host='0.0.0.0', port=port, debug=False)
