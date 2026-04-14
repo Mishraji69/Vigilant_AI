@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd vigilant_AI/cyber-security-llm-agents && python api_server.py",
+    "startCommand": "python3 vigilant_AI/cyber-security-llm-agents/api_server.py",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
