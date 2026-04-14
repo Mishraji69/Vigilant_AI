@@ -17,18 +17,99 @@ const SCENARIOS = [
   { id: 'TTP_REPORT_TO_ADVERSARY_PROFILE', name: '🎭 Create Adversary Profile', category: 'Advanced', requiresCaldera: true, reliable: false },
 ];
 
+const toCleanString = (value) => {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+};
+
+const stripAnsi = (text) => text.replace(/\u001b\[[0-9;]*m/g, '');
+
+const normalizeScenarioOutput = (raw) => {
+  let text = stripAnsi(toCleanString(raw));
+  text = text.replace(/\r\n/g, '\n');
+  text = text.replace(/\n{4,}/g, '\n\n\n');
+  return text.trim();
+};
+
+const pickBestResponseBlock = (normalized) => {
+  // Prefer the last agent "Response:" block (often the human-readable answer).
+  const blocks = [];
+  const re = /(?:^|\n)(?:[^\n]*\bResponse:\n)([\s\S]*?)(?=\n={10,}|\nTERMINATE\b|\nRuntime logging stopped|\nTotal tokens\b|$)/g;
+  let match;
+  while ((match = re.exec(normalized)) !== null) {
+    const body = (match[1] || '').trim();
+    if (body) blocks.push(body);
+  }
+  if (blocks.length > 0) return blocks[blocks.length - 1];
+  return '';
+};
+
+const cleanupForHumans = (text) => {
+  if (!text) return '';
+
+  // Remove obvious framework noise.
+  const lines = text
+    .split('\n')
+    .filter((l) => {
+      const s = l.trim();
+      if (!s) return true;
+      if (s.startsWith('Runtime logging')) return false;
+      if (s.startsWith('Agent task_coordinator_agent:')) return false;
+      if (s.startsWith('=== Sending to ')) return false;
+      if (s.startsWith('==============================')) return false;
+      if (s.startsWith('Total tokens for')) return false;
+      return true;
+    });
+
+  let cleaned = lines.join('\n').trim();
+  cleaned = cleaned.replace(/\bTERMINATE\b/g, '').trim();
+  cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  return cleaned;
+};
+
+const looksLikeFunctionDump = (text) => {
+  const t = (text || '').trim();
+  if (t.length < 40) return false;
+  return (
+    /^function\s+\w+\s*\(/.test(t) ||
+    /^async function\s+\w+\s*\(/.test(t) ||
+    /^\(\s*\)\s*=>\s*\{/.test(t) ||
+    /^\w+\s*=>\s*\{/.test(t) ||
+    /\[Function:/.test(t)
+  );
+};
+
 // Helper function to extract key information from scenario output
 const extractScenarioOutput = (output, scenarioId) => {
-  if (!output) return 'No output available';
-  
-  // Extract text after "Response:" or before "TERMINATE"
-  const responseMatch = output.match(/Response:\n([\s\S]*?)(?:TERMINATE|={10,})/);
-  if (responseMatch && responseMatch[1].trim()) {
-    return responseMatch[1].trim();
+  const normalized = normalizeScenarioOutput(output);
+  if (!normalized) return 'No output available';
+
+  // If the run clearly failed at the LLM layer, surface that concisely.
+  if (normalized.includes('Error code: 401') || normalized.includes('invalid_api_key')) {
+    return 'The scenario ran, but the LLM request was rejected (invalid API key). Check backend env vars and redeploy/restart.';
   }
-  
-  // If no match, return the full output
-  return output;
+
+  // Prefer the response block; fall back to the tail of the output.
+  const bestBlock = pickBestResponseBlock(normalized);
+  const candidate = cleanupForHumans(bestBlock || normalized);
+  if (!candidate) return 'No output available';
+
+  if (looksLikeFunctionDump(candidate)) {
+    return 'This scenario returned an internal tool/function snippet instead of a human-readable result. Open “Show Full Output” to inspect the raw output.';
+  }
+
+  // Keep results readable: cap extremely long outputs in the main box.
+  const maxChars = 2200;
+  if (candidate.length > maxChars) {
+    return `${candidate.slice(0, maxChars).trim()}\n\n(Truncated — open “Show Full Output” for the full transcript.)`;
+  }
+
+  return candidate;
 };
 
 const Dashboard = () => {
