@@ -27,46 +27,83 @@ export const coordinatorService = {
   async getPipelineStatus() {
     try {
       const scenarios = await this.getScenarios();
-      
-      // Map scenarios to pipeline stages
-      const stages = [
-        {
-          id: 'recon',
-          name: 'Reconnaissance',
-          status: 'pending',
-          progress: 0
-        },
-        {
-          id: 'collect',
-          name: 'Collection',
-          status: 'pending',
-          progress: 0
-        },
-        {
-          id: 'analyze',
-          name: 'Analysis',
-          status: 'pending',
-          progress: 0
-        },
-        {
-          id: 'report',
-          name: 'Reporting',
-          status: 'pending',
-          progress: 0
-        }
-      ];
 
-      // Update stages based on running scenarios
-      const runningScenarios = scenarios.filter(s => s.status === 'running');
-      if (runningScenarios.length > 0) {
-        stages[0].status = 'active';
-        stages[0].progress = 50;
+      // UI-only stage mapping. We infer where we are from the running scenario
+      // and avoid leaving the pipeline in "pending" after a run completes.
+      const STAGE_BY_SCENARIO_ID = {
+        // Reconnaissance / Caldera
+        HELLO_CALDERA: 'recon',
+        COLLECT_CALDERA_INFO: 'recon',
+        DETECT_EDR: 'recon',
+        DETECT_AGENT_PRIVILEGES: 'recon',
+
+        // Collection / intake
+        SUMMARIZE_RECENT_CISA_VULNS: 'collect',
+
+        // Analysis / research
+        HELLO_AGENTS: 'analyze',
+        IDENTIFY_EDR_BYPASS_TECHNIQUES: 'analyze',
+        TTP_REPORT_TO_TECHNIQUES: 'analyze',
+
+        // Reporting / profile creation
+        TTP_REPORT_TO_ADVERSARY_PROFILE: 'report',
+      };
+
+      const stageOrder = ['recon', 'collect', 'analyze', 'report'];
+      const stageMeta = {
+        recon: { id: 'recon', name: 'Reconnaissance' },
+        collect: { id: 'collect', name: 'Collection' },
+        analyze: { id: 'analyze', name: 'Analysis' },
+        report: { id: 'report', name: 'Reporting' },
+      };
+
+      const stageState = {
+        recon: { status: 'pending', progress: 0 },
+        collect: { status: 'pending', progress: 0 },
+        analyze: { status: 'pending', progress: 0 },
+        report: { status: 'pending', progress: 0 },
+      };
+
+      const runningStages = scenarios
+        .filter((s) => s.status === 'running')
+        .map((s) => STAGE_BY_SCENARIO_ID[s.id])
+        .filter(Boolean);
+
+      if (runningStages.length > 0) {
+        const currentIdx = Math.max(
+          0,
+          Math.min(
+            stageOrder.length - 1,
+            Math.min(...runningStages.map((id) => stageOrder.indexOf(id)).filter((i) => i >= 0))
+          )
+        );
+        const currentStageId = stageOrder[currentIdx];
+
+        stageOrder.forEach((id, idx) => {
+          if (idx < currentIdx) stageState[id] = { status: 'completed', progress: 100 };
+          if (idx === currentIdx) stageState[id] = { status: 'active', progress: 50 };
+        });
+
+        return {
+          stages: stageOrder.map((id) => ({ ...stageMeta[id], ...stageState[id] })),
+          currentStage: currentStageId,
+        };
       }
 
-      return {
-        stages: stages,
-        currentStage: runningScenarios.length > 0 ? 'recon' : null
-      };
+      const anyFailed = scenarios.some((s) => s.status === 'failed');
+      const anyCompleted = scenarios.some((s) => s.status === 'completed');
+
+      if (anyFailed) {
+        stageOrder.forEach((id) => (stageState[id] = { status: 'failed', progress: 100 }));
+        return { stages: stageOrder.map((id) => ({ ...stageMeta[id], ...stageState[id] })), currentStage: null };
+      }
+
+      if (anyCompleted) {
+        stageOrder.forEach((id) => (stageState[id] = { status: 'completed', progress: 100 }));
+        return { stages: stageOrder.map((id) => ({ ...stageMeta[id], ...stageState[id] })), currentStage: null };
+      }
+
+      return { stages: stageOrder.map((id) => ({ ...stageMeta[id], ...stageState[id] })), currentStage: null };
     } catch (error) {
       console.error('Failed to fetch pipeline status:', error);
       throw error;

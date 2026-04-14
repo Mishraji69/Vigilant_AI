@@ -3,6 +3,10 @@ const ReportViewer = ({ content, title }) => {
   const renderContent = (text) => {
     if (!text) return null;
 
+    // Some report sources include HTML fragments. This lightweight renderer isn't
+    // a full HTML renderer; strip tags so users see normal readable text.
+    const stripHtml = (s) => (typeof s === 'string' ? s.replace(/<[^>]*>/g, '') : s);
+
     const lines = text.split('\n');
     const elements = [];
     let currentParagraph = [];
@@ -10,8 +14,9 @@ const ReportViewer = ({ content, title }) => {
     let codeBlockContent = [];
 
     lines.forEach((line, index) => {
+      const safeLine = stripHtml(line);
       // Code blocks
-      if (line.startsWith('```')) {
+      if (safeLine.startsWith('```')) {
         if (inCodeBlock) {
           elements.push(
             <pre key={`code-${index}`} className="bg-cyber-dark p-4 rounded border border-cyber-blue/20 overflow-x-auto my-4">
@@ -22,7 +27,7 @@ const ReportViewer = ({ content, title }) => {
           inCodeBlock = false;
         } else {
           if (currentParagraph.length > 0) {
-            elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+            elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
             currentParagraph = [];
           }
           inCodeBlock = true;
@@ -31,71 +36,71 @@ const ReportViewer = ({ content, title }) => {
       }
 
       if (inCodeBlock) {
-        codeBlockContent.push(line);
+        codeBlockContent.push(safeLine);
         return;
       }
 
       // Headers
-      if (line.startsWith('# ')) {
+      if (safeLine.startsWith('# ')) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
-        elements.push(<h1 key={index} className="text-3xl font-bold text-cyber-blue mt-6 mb-4">{line.slice(2)}</h1>);
-      } else if (line.startsWith('## ')) {
+        elements.push(<h1 key={index} className="text-3xl font-bold text-cyber-blue mt-6 mb-4">{safeLine.slice(2)}</h1>);
+      } else if (safeLine.startsWith('## ')) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
-        elements.push(<h2 key={index} className="text-2xl font-bold text-cyber-blue mt-5 mb-3">{line.slice(3)}</h2>);
-      } else if (line.startsWith('### ')) {
+        elements.push(<h2 key={index} className="text-2xl font-bold text-cyber-blue mt-5 mb-3">{safeLine.slice(3)}</h2>);
+      } else if (safeLine.startsWith('### ')) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
-        elements.push(<h3 key={index} className="text-xl font-bold text-cyan-400 mt-4 mb-2">{line.slice(4)}</h3>);
-      } else if (line.startsWith('#### ')) {
+        elements.push(<h3 key={index} className="text-xl font-bold text-cyan-400 mt-4 mb-2">{safeLine.slice(4)}</h3>);
+      } else if (safeLine.startsWith('#### ')) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
-        elements.push(<h4 key={index} className="text-lg font-bold text-gray-300 mt-3 mb-2">{line.slice(5)}</h4>);
+        elements.push(<h4 key={index} className="text-lg font-bold text-gray-300 mt-3 mb-2">{safeLine.slice(5)}</h4>);
       }
       // Lists
-      else if (line.match(/^[\-\*]\s/)) {
+      else if (safeLine.match(/^[-*]\s/)) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
         elements.push(
           <li key={index} className="ml-6 my-1 text-gray-300">
-            {line.slice(2)}
+            {safeLine.slice(2)}
           </li>
         );
       }
       // Numbered lists
-      else if (line.match(/^\d+\.\s/)) {
+      else if (safeLine.match(/^\d+\.\s/)) {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
-        const match = line.match(/^\d+\.\s(.+)/);
+        const match = safeLine.match(/^\d+\.\s(.+)/);
         elements.push(
           <li key={index} className="ml-6 my-1 text-gray-300 list-decimal">
-            {match ? match[1] : line}
+            {match ? match[1] : safeLine}
           </li>
         );
       }
       // Horizontal rule
-      else if (line === '---') {
+      else if (safeLine === '---') {
         if (currentParagraph.length > 0) {
-          elements.push(<p key={`p-${index}`} className="my-2">{currentParagraph.join(' ')}</p>);
+          elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
         }
         elements.push(<hr key={index} className="my-6 border-cyber-blue/20" />);
       }
       // Empty line - end paragraph
-      else if (line.trim() === '') {
+      else if (safeLine.trim() === '') {
         if (currentParagraph.length > 0) {
           elements.push(<p key={`p-${index}`} className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
           currentParagraph = [];
@@ -103,17 +108,12 @@ const ReportViewer = ({ content, title }) => {
       }
       // Regular text
       else {
-        // Handle bold **text**
-        let processedLine = line.replace(/\*\*(.+?)\*\*/g, '<strong class="text-white font-bold">$1</strong>');
-        // Handle inline code `code`
-        processedLine = processedLine.replace(/`(.+?)`/g, '<code class="bg-cyber-dark px-1 py-0.5 rounded text-cyber-green text-sm">$1</code>');
-        
-        currentParagraph.push(processedLine);
+        currentParagraph.push(safeLine);
       }
     });
 
     if (currentParagraph.length > 0) {
-      elements.push(<p key="final-p" className="my-2 text-gray-300" dangerouslySetInnerHTML={{ __html: currentParagraph.join(' ') }} />);
+      elements.push(<p key="final-p" className="my-2 text-gray-300">{currentParagraph.join(' ')}</p>);
     }
 
     return elements;
